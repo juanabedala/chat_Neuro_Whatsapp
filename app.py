@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)  # habilita CORS para todos los orígenes
+CORS(app, origins="*", supports_credentials=False, send_wildcard=True)
 
 # 🔹 Configuración desde variables de entorno
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
