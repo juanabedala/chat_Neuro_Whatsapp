@@ -1,4 +1,4 @@
-# Importaciones necesarias
+# backend.py
 import json
 import faiss
 import numpy as np
@@ -21,10 +21,10 @@ METADATA_FILE = "metadata.json"
 # === APP FLASK ===
 app = Flask(__name__)
 
-# === PROXY FIX (para que CORS funcione detrás de Railway/Gunicorn) ===
+# ProxyFix para que los headers CORS funcionen detrás de Railway/Gunicorn
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# === Habilitar CORS global para tu frontend ===
+# Habilitar CORS global solo para tu frontend
 CORS(
     app,
     origins="https://www.neuro.uy",
@@ -74,17 +74,16 @@ Pregunta:
     respuesta = modelo.generate_content(prompt)
     return respuesta.text
 
-# === ENDPOINT API ===
+# === ENDPOINT PRINCIPAL ===
 @app.route("/consultar", methods=["POST", "OPTIONS"])
 def consultar():
-    # OPTIONS (preflight) se maneja automáticamente
+    # Manejo explícito de preflight OPTIONS
     if request.method == "OPTIONS":
         return jsonify({}), 200
 
     # POST normal
     data = request.get_json()
     pregunta = data.get("pregunta")
-
     if not pregunta:
         return jsonify({"error": "Falta el campo 'pregunta'"}), 400
 
@@ -95,12 +94,11 @@ def consultar():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# === ENDPOINT GLOBAL PARA CUALQUIER PRELIGHT (opcional) ===
+# === ENDPOINT GLOBAL OPTIONS (para cualquier ruta adicional) ===
 @app.route("/<path:path>", methods=["OPTIONS"])
 def options_handler(path):
     return jsonify({}), 200
 
-# === INICIO LOCAL (OPCIONAL) ===
+# === INICIO LOCAL OPCIONAL ===
 if __name__ == "__main__":
     app.run(debug=True, port=8000)
-
