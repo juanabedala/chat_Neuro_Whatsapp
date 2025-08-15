@@ -1,4 +1,4 @@
-# Importaciones necesarias para la aplicación Flask
+# Importaciones necesarias
 import json
 import faiss
 import numpy as np
@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import os
 
 from flask import Flask, request, jsonify
+from flask_cors import CORS  # ✅ Importamos CORS
 
 # === CONFIGURACIÓN ===
 load_dotenv()
@@ -19,13 +20,8 @@ METADATA_FILE = "metadata.json"
 # === APP FLASK ===
 app = Flask(__name__)
 
-# === MANEJO DE CORS GLOBAL Y ROBUSTO ===
-@app.after_request
-def add_cors_headers(response):
-    response.headers["Access-Control-Allow-Origin"] = "https://www.neuro.uy"
-    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    return response
+# === Habilitar CORS para tu frontend ===
+CORS(app, origins="https://www.neuro.uy", methods=["POST", "OPTIONS"], allow_headers=["Content-Type"])
 
 # === FUNCIONES ===
 def obtener_embedding(texto):
@@ -70,31 +66,22 @@ Pregunta:
     return respuesta.text
 
 # === ENDPOINT API ===
-@app.route("/consultar", methods=["POST", "OPTIONS"])
+@app.route("/consultar", methods=["POST"])
 def consultar():
-    if request.method == "OPTIONS":
-        # Preflight CORS
-        response = jsonify({})
-        response.status_code = 200
-        return response
-
-    # POST
     data = request.get_json()
     pregunta = data.get("pregunta")
 
     if not pregunta:
-        response = jsonify({"error": "Falta el campo 'pregunta'"})
-        return response, 400
+        return jsonify({"error": "Falta el campo 'pregunta'"}), 400
 
     try:
         contexto = buscar_contexto_para_gemini(pregunta)
         respuesta = responder_con_gemini(pregunta, contexto)
-        response = jsonify({"respuesta": respuesta})
-        return response
+        return jsonify({"respuesta": respuesta})
     except Exception as e:
-        response = jsonify({"error": str(e)})
-        return response, 500
+        return jsonify({"error": str(e)}), 500
 
 # === INICIO LOCAL (OPCIONAL) ===
 if __name__ == "__main__":
     app.run(debug=True, port=8000)
+
