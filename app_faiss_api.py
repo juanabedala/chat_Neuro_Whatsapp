@@ -7,27 +7,35 @@ from dotenv import load_dotenv
 import os
 
 from flask import Flask, request, jsonify
-from flask_cors import CORS # Importación de la extensión Flask-CORS
+
+# No necesitas importar 'CORS' ni 'make_response' si manejas los encabezados manualmente
+# from flask_cors import CORS
+# from flask import make_response
 
 # === CONFIGURACIÓN ===
-# Carga las variables de entorno del archivo .env
 load_dotenv()
-# Obtiene la clave de la API de Gemini
 API_KEY = os.getenv("GEMINI_API_KEY")
-# Configura la API de Gemini
 genai.configure(api_key=API_KEY)
 
-# Nombres de los archivos para el índice FAISS y los metadatos
 INDEX_FILE = "vector_index.faiss"
 METADATA_FILE = "metadata.json"
 
 # === APP FLASK ===
 app = Flask(__name__)
-# Configuración de CORS con la extensión.
-# Esto es la forma más limpia de resolver el problema.
-# Permite que el dominio "https://www.neuro.uy" acceda al endpoint "/consultar".
-# Flask-CORS se encargará automáticamente de las peticiones OPTIONS (preflight).
-CORS(app, resources={r"/consultar": {"origins": "https://www.neuro.uy"}})
+
+# === MANEJO DE CORS GLOBAL Y ROBUSTO ===
+# Este decorador se ejecuta DESPUÉS de cada petición y agrega los encabezados
+# CORS a CADA respuesta, independientemente del método (POST, OPTIONS, etc.).
+# Esto asegura que el encabezado esté siempre presente.
+@app.after_request
+def add_cors_headers(response):
+    # Agrega el encabezado que permite el acceso desde el origen de tu frontend
+    response.headers["Access-Control-Allow-Origin"] = "https://www.neuro.uy"
+    # Agrega los métodos HTTP que están permitidos
+    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+    # Agrega los encabezados que el cliente puede enviar
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    return response
 
 # === FUNCIONES ===
 def obtener_embedding(texto):
@@ -50,7 +58,6 @@ def cargar_index_y_metadata():
 
     index = faiss.read_index(INDEX_FILE)
     with open(METADATA_FILE, "r", encoding="utf-8") as f:
-        # Carga los metadatos del archivo JSON
         metadata = json.load(f)["metadatos"]
     return index, metadata
 
@@ -60,11 +67,9 @@ def buscar_contexto_para_gemini(consulta, top_k=3):
     """
     index, metadata = cargar_index_y_metadata()
     vector_consulta = obtener_embedding(consulta)
-    # Realiza la búsqueda en el índice
     D, I = index.search(np.array([vector_consulta]), k=top_k)
 
     contexto = ""
-    # Construye el contexto a partir de los documentos encontrados
     for idx in I[0]:
         doc = metadata[idx]
         contexto += f"Documento: {doc['documento']}\nTexto: {doc['texto']}\n\n"
@@ -85,13 +90,11 @@ Contexto:
 Pregunta:
 {pregunta}
 """
-    # Genera la respuesta
     respuesta = modelo.generate_content(prompt)
     return respuesta.text
 
 # === ENDPOINT API ===
-# El endpoint ahora solo necesita manejar la petición POST, ya que la extensión
-# Flask-CORS se encarga de la preflight OPTIONS.
+# Ahora el endpoint solo necesita manejar la petición POST, el CORS se gestiona globalmente.
 @app.route("/consultar", methods=["POST"])
 def consultar():
     """
@@ -101,22 +104,18 @@ def consultar():
     pregunta = data.get("pregunta")
 
     if not pregunta:
-        # Devuelve un error si no se proporciona una pregunta
         response = jsonify({"error": "Falta el campo 'pregunta'"})
         return response, 400
 
     try:
-        # Busca el contexto, genera la respuesta y la devuelve
         contexto = buscar_contexto_para_gemini(pregunta)
         respuesta = responder_con_gemini(pregunta, contexto)
         response = jsonify({"respuesta": respuesta})
         return response
     except Exception as e:
-        # Manejo de errores y devolución de un mensaje de error
         response = jsonify({"error": str(e)})
         return response, 500
 
 # === INICIO LOCAL (OPCIONAL) ===
 if __name__ == "__main__":
-    # Inicia el servidor Flask en modo de depuración
     app.run(debug=True, port=8000)
