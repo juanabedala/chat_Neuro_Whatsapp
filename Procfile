@@ -1,1 +1,1 @@
-web: python app_faiss_api.py
+web: gunicorn backend:app
