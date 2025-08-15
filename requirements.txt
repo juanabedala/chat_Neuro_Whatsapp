@@ -1,4 +1,8 @@
+gunicorn
 Flask
-Flask-Cors
+flask-cors
+faiss-cpu
 python-dotenv
-requests
+google-generativeai
+numpy
+
