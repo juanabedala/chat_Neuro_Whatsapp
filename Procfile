@@ -1,1 +1,1 @@
-web: gunicorn app_faiss_api:app --bind 0.0.0.0:$PORT
+web: python app_faiss_api.py
