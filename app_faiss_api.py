@@ -5,7 +5,7 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import os
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 
 # === CONFIGURACIÓN ===
@@ -18,10 +18,10 @@ METADATA_FILE = "metadata.json"
 
 # === APP FLASK ===
 app = Flask(__name__)
-# CORS(app)  # Permite peticiones desde cualquier origen (útil si el frontend está en otro servidor)
+CORS(app)  # Permite peticiones desde cualquier origen (útil si el frontend está en otro servidor)
 #CORS(app, origins="*", supports_credentials=False, send_wildcard=True)
 #CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=False)
-CORS(app, resources={r"/consultar": {"origins": "https://www.neuro.uy"}}, supports_credentials=False)
+# CORS(app, resources={r"/consultar": {"origins": "https://www.neuro.uy"}}, supports_credentials=False)
 
 # === FUNCIONES ===
 def obtener_embedding(texto):
@@ -67,18 +67,21 @@ Pregunta:
     respuesta = modelo.generate_content(prompt)
     return respuesta.text
 
-# === ENDPOINT API ===
-@app.route("/consultar", methods=["POST", "OPTIONS"])
-def consultar():
-    
-    if request.method == "OPTIONS":
-        # 🔹 Preflight OK
-        response = app.make_response('')
+# === CORS para preflight OPTIONS globalmente ===
+@app.before_request
+def handle_options_preflight():
+    if request.method == 'OPTIONS':
+        response = make_response()
         response.headers.add("Access-Control-Allow-Origin", "https://www.neuro.uy")
         response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
         response.headers.add("Access-Control-Allow-Headers", "Content-Type")
         return response, 200
-        
+
+# === ENDPOINT API ===
+@app.route("/consultar", methods=["POST"])
+def consultar():
+    
+    
     data = request.get_json()
     pregunta = data.get("pregunta")
 
