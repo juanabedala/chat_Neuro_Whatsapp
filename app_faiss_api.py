@@ -68,8 +68,16 @@ Pregunta:
     return respuesta.text
 
 # === ENDPOINT API ===
-@app.route("/consultar", methods=["POST"])
+@app.route("/consultar", methods=["POST", "OPTIONS"])
 def consultar():
+    
+    if request.method == "OPTIONS":
+        # 🔹 Preflight OK
+        response = app.make_response('')
+        response.headers.add("Access-Control-Allow-Origin", "https://www.neuro.uy")
+        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        return response, 200
         
     data = request.get_json()
     pregunta = data.get("pregunta")
@@ -87,4 +95,3 @@ def consultar():
 # === INICIO LOCAL (OPCIONAL) ===
 if __name__ == "__main__":
     app.run(debug=True, port=8000)
-
