@@ -21,7 +21,7 @@ app = Flask(__name__)
 # CORS(app)  # Permite peticiones desde cualquier origen (útil si el frontend está en otro servidor)
 #CORS(app, origins="*", supports_credentials=False, send_wildcard=True)
 #CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=False)
-CORS(app, resources={r"/consultar": {"origins": "https://www.neuro.uy"}}, supports_credentials=True)
+CORS(app, resources={r"/consultar": {"origins": "https://www.neuro.uy"}}, supports_credentials=False)
 
 # === FUNCIONES ===
 def obtener_embedding(texto):
@@ -87,3 +87,4 @@ def consultar():
 # === INICIO LOCAL (OPCIONAL) ===
 if __name__ == "__main__":
     app.run(debug=True, port=8000)
+
