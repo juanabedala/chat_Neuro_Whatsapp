@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 import os
 
 from flask import Flask, request, jsonify
-from flask_cors import CORS  # ✅ Manejo automático de CORS
+from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # === CONFIGURACIÓN ===
 load_dotenv()
@@ -20,8 +21,10 @@ METADATA_FILE = "metadata.json"
 # === APP FLASK ===
 app = Flask(__name__)
 
-# === Habilitar CORS para tu frontend ===
-# Esto asegura que cualquier método (POST, OPTIONS) devuelva los headers CORS
+# === PROXY FIX (para que CORS funcione detrás de Railway/Gunicorn) ===
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
+# === Habilitar CORS global para tu frontend ===
 CORS(
     app,
     origins="https://www.neuro.uy",
@@ -74,11 +77,11 @@ Pregunta:
 # === ENDPOINT API ===
 @app.route("/consultar", methods=["POST", "OPTIONS"])
 def consultar():
-    # OPTIONS (preflight) se maneja automáticamente con flask_cors
+    # OPTIONS (preflight) se maneja automáticamente
     if request.method == "OPTIONS":
         return jsonify({}), 200
 
-    # POST
+    # POST normal
     data = request.get_json()
     pregunta = data.get("pregunta")
 
@@ -95,9 +98,9 @@ def consultar():
 # === ENDPOINT GLOBAL PARA CUALQUIER PRELIGHT (opcional) ===
 @app.route("/<path:path>", methods=["OPTIONS"])
 def options_handler(path):
-    # Esto asegura que cualquier ruta con OPTIONS devuelva los headers CORS
     return jsonify({}), 200
 
 # === INICIO LOCAL (OPCIONAL) ===
 if __name__ == "__main__":
     app.run(debug=True, port=8000)
+
