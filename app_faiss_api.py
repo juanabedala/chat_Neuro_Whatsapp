@@ -19,8 +19,8 @@ METADATA_FILE = "metadata.json"
 # === APP FLASK ===
 app = Flask(__name__)
 # CORS(app)  # Permite peticiones desde cualquier origen (útil si el frontend está en otro servidor)
-CORS(app, origins="*", supports_credentials=False, send_wildcard=True)
-#CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=False)
+#CORS(app, origins="*", supports_credentials=False, send_wildcard=True)
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=False)
 
 # === FUNCIONES ===
 def obtener_embedding(texto):
@@ -67,8 +67,12 @@ Pregunta:
     return respuesta.text
 
 # === ENDPOINT API ===
-@app.route("/consultar", methods=["POST"])
+@app.route("/consultar", methods=["POST", "OPTIONS"])
 def consultar():
+    if request.method == "OPTIONS":
+        # Respuesta al preflight CORS
+        return '', 200
+    
     data = request.get_json()
     pregunta = data.get("pregunta")
 
