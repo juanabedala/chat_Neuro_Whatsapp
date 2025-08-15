@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 import os
 
 from flask import Flask, request, jsonify
-from flask_cors import CORS  # ✅ Importamos CORS
+from flask_cors import CORS  # ✅ Manejo automático de CORS
 
 # === CONFIGURACIÓN ===
 load_dotenv()
@@ -21,7 +21,13 @@ METADATA_FILE = "metadata.json"
 app = Flask(__name__)
 
 # === Habilitar CORS para tu frontend ===
-CORS(app, origins="*", methods=["POST", "OPTIONS"], allow_headers=["Content-Type"])
+# Esto asegura que cualquier método (POST, OPTIONS) devuelva los headers CORS
+CORS(
+    app,
+    origins="https://www.neuro.uy",
+    methods=["POST", "OPTIONS"],
+    allow_headers=["Content-Type"]
+)
 
 # === FUNCIONES ===
 def obtener_embedding(texto):
@@ -66,8 +72,13 @@ Pregunta:
     return respuesta.text
 
 # === ENDPOINT API ===
-@app.route("/consultar", methods=["POST"])
+@app.route("/consultar", methods=["POST", "OPTIONS"])
 def consultar():
+    # OPTIONS (preflight) se maneja automáticamente con flask_cors
+    if request.method == "OPTIONS":
+        return jsonify({}), 200
+
+    # POST
     data = request.get_json()
     pregunta = data.get("pregunta")
 
@@ -81,7 +92,12 @@ def consultar():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# === ENDPOINT GLOBAL PARA CUALQUIER PRELIGHT (opcional) ===
+@app.route("/<path:path>", methods=["OPTIONS"])
+def options_handler(path):
+    # Esto asegura que cualquier ruta con OPTIONS devuelva los headers CORS
+    return jsonify({}), 200
+
 # === INICIO LOCAL (OPCIONAL) ===
 if __name__ == "__main__":
     app.run(debug=True, port=8000)
-
