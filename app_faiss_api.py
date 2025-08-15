@@ -21,7 +21,7 @@ METADATA_FILE = "metadata.json"
 app = Flask(__name__)
 
 # === Habilitar CORS para tu frontend ===
-CORS(app, origins="https://www.neuro.uy", methods=["POST", "OPTIONS"], allow_headers=["Content-Type"])
+CORS(app, origins="*", methods=["POST", "OPTIONS"], allow_headers=["Content-Type"])
 
 # === FUNCIONES ===
 def obtener_embedding(texto):
