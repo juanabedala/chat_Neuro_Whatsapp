@@ -62,8 +62,8 @@ def buscar_contexto_para_gemini(consulta, top_k=3):
 def responder_con_gemini(pregunta, contexto):
     modelo = genai.GenerativeModel("gemini-2.5-flash")
     prompt = f"""
-Usá el siguiente contexto para responder la pregunta del usuario, si no encuentras la respuesta intenta responderla tu,
-ten encuenta que somos una empresa de TI que soluciona problemas a la industria y al agro.
+Usá el siguiente contexto para responder la pregunta del usuario, si no encuentras la respuesta intenta responderla tú,
+ten en cuenta que somos una empresa de TI que soluciona problemas a la industria y al agro.
 
 Contexto:
 {contexto}
@@ -101,4 +101,5 @@ def options_handler(path):
 
 # === INICIO LOCAL OPCIONAL ===
 if __name__ == "__main__":
-    app.run(debug=True, port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port, debug=True)
