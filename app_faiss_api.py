@@ -78,22 +78,35 @@ def handle_options_preflight():
         return response, 200
 
 # === ENDPOINT API ===
-@app.route("/consultar", methods=["POST"])
+@app.route("/consultar", methods=["POST", "OPTIONS"])
 def consultar():
+    
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add("Access-Control-Allow-Origin", "https://www.neuro.uy")
+        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        return response, 200
     
     
     data = request.get_json()
     pregunta = data.get("pregunta")
 
     if not pregunta:
-        return jsonify({"error": "Falta el campo 'pregunta'"}), 400
+        response = jsonify({"error": "Falta el campo 'pregunta'"})
+        response.headers["Access-Control-Allow-Origin"] = "https://www.neuro.uy"
+        return response, 400
 
     try:
         contexto = buscar_contexto_para_gemini(pregunta)
         respuesta = responder_con_gemini(pregunta, contexto)
-        return jsonify({"respuesta": respuesta})
+        response = jsonify({"respuesta": respuesta})
+        response.headers["Access-Control-Allow-Origin"] = "https://www.neuro.uy"
+        return response
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        response = jsonify({"error": str(e)})
+        response.headers["Access-Control-Allow-Origin"] = "https://www.neuro.uy"
+        return response, 500
 
 # === INICIO LOCAL (OPCIONAL) ===
 if __name__ == "__main__":
