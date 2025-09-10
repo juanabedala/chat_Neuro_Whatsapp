@@ -13,6 +13,9 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 # === CONFIGURACIÓN ===
 load_dotenv()
 API_KEY = os.getenv("GEMINI_API_KEY")
+
+if not API_KEY:
+    print("⚠️  GEMINI_API_KEY no está definido en las variables de entorno")
 genai.configure(api_key=API_KEY)
 
 INDEX_FILE = "vector_index.faiss"
@@ -20,19 +23,8 @@ METADATA_FILE = "metadata.json"
 
 # === APP FLASK ===
 app = Flask(__name__)
-
-# ProxyFix para que los headers CORS funcionen detrás de Railway/Gunicorn
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Habilitar CORS global solo para tu frontend
-"""
-CORS(
-    app,
-    origins="https://www.neuro.uy",
-    methods=["POST", "OPTIONS"],
-    allow_headers=["Content-Type"]
-)
-"""
 CORS(
     app,
     origins=["https://neuro.uy", "https://www.neuro.uy"],
@@ -47,7 +39,14 @@ def obtener_embedding(texto):
         content=texto,
         task_type="RETRIEVAL_QUERY"
     )
-    return np.array(response["embedding"], dtype=np.float32)
+
+    # Manejo flexible según versión de librería
+    if isinstance(response, dict):
+        return np.array(response["embedding"], dtype=np.float32)
+    elif hasattr(response, "embedding"):
+        return np.array(response.embedding, dtype=np.float32)
+    else:
+        raise ValueError(f"❌ No se encontró el embedding en la respuesta: {response}")
 
 def cargar_index_y_metadata():
     if not os.path.exists(INDEX_FILE) or not os.path.exists(METADATA_FILE):
@@ -80,16 +79,21 @@ Pregunta:
 {pregunta}
 """
     respuesta = modelo.generate_content(prompt)
-    return respuesta.text
+
+    # Manejo robusto de salida
+    if hasattr(respuesta, "text"):
+        return respuesta.text
+    elif hasattr(respuesta, "candidates"):
+        return respuesta.candidates[0].content.parts[0].text
+    else:
+        raise ValueError(f"❌ No se pudo interpretar la respuesta de Gemini: {respuesta}")
 
 # === ENDPOINT PRINCIPAL ===
 @app.route("/consultar", methods=["POST", "OPTIONS"])
 def consultar():
-    # Manejo explícito de preflight OPTIONS
     if request.method == "OPTIONS":
         return jsonify({}), 200
 
-    # POST normal
     data = request.get_json()
     pregunta = data.get("pregunta")
     if not pregunta:
@@ -100,14 +104,13 @@ def consultar():
         respuesta = responder_con_gemini(pregunta, contexto)
         return jsonify({"respuesta": respuesta})
     except Exception as e:
+        print("❌ ERROR en /consultar:", e)  # Log visible en Railway
         return jsonify({"error": str(e)}), 500
 
-# === ENDPOINT GLOBAL OPTIONS (para cualquier ruta adicional) ===
 @app.route("/<path:path>", methods=["OPTIONS"])
 def options_handler(path):
     return jsonify({}), 200
 
-# === INICIO LOCAL OPCIONAL ===
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     app.run(host="0.0.0.0", port=port, debug=True)
