@@ -34,6 +34,7 @@ CORS(
 
 # === FUNCIONES ===
 def obtener_embedding(texto):
+    print("📩 Texto a embebear:", texto[:200])  # primeros 200 chars
     response = genai.embed_content(
         model="models/embedding-001",
         content=texto,
