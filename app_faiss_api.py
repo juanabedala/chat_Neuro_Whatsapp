@@ -1,10 +1,11 @@
-# backend.py
 import json
 import faiss
 import numpy as np
 import google.generativeai as genai
 from dotenv import load_dotenv
 import os
+from functools import lru_cache
+from datetime import datetime
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -21,6 +22,18 @@ genai.configure(api_key=API_KEY)
 INDEX_FILE = "vector_index.faiss"
 METADATA_FILE = "metadata.json"
 
+# === CONTROL DE USO DE EMBEDDINGS ===
+uso_embeddings = {"fecha": datetime.now().date(), "count": 0}
+
+def contar_embedding_call():
+    """Lleva un conteo diario de las llamadas al modelo embedding-001"""
+    global uso_embeddings
+    hoy = datetime.now().date()
+    if uso_embeddings["fecha"] != hoy:
+        uso_embeddings = {"fecha": hoy, "count": 0}
+    uso_embeddings["count"] += 1
+    print(f"📊 Llamadas a embedding hoy: {uso_embeddings['count']}")
+
 # === APP FLASK ===
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
@@ -33,8 +46,27 @@ CORS(
 )
 
 # === FUNCIONES ===
-def obtener_embedding(texto):
+def cargar_index_y_metadata():
+    if not os.path.exists(INDEX_FILE) or not os.path.exists(METADATA_FILE):
+        raise FileNotFoundError("❌ No se encontraron los archivos FAISS o metadata.json")
+    index = faiss.read_index(INDEX_FILE)
+    with open(METADATA_FILE, "r", encoding="utf-8") as f:
+        metadata = json.load(f)["metadatos"]
+    return index, metadata
+
+# Cargamos FAISS y metadata una sola vez al inicio
+try:
+    index, metadata = cargar_index_y_metadata()
+    print("✅ Índice FAISS y metadata cargados en memoria")
+except Exception as e:
+    print(f"⚠️ Error cargando FAISS: {e}")
+    index, metadata = None, None
+
+@lru_cache(maxsize=5000)
+def obtener_embedding_cacheado(texto):
+    """Devuelve el embedding del texto con cacheo para evitar llamadas repetidas"""
     print("📩 Texto a embebear:", texto[:200])  # primeros 200 chars
+    contar_embedding_call()
     response = genai.embed_content(
         model="models/embedding-001",
         content=texto,
@@ -49,18 +81,13 @@ def obtener_embedding(texto):
     else:
         raise ValueError(f"❌ No se encontró el embedding en la respuesta: {response}")
 
-def cargar_index_y_metadata():
-    if not os.path.exists(INDEX_FILE) or not os.path.exists(METADATA_FILE):
-        raise FileNotFoundError("❌ No se encontraron los archivos FAISS o metadata.json")
-    index = faiss.read_index(INDEX_FILE)
-    with open(METADATA_FILE, "r", encoding="utf-8") as f:
-        metadata = json.load(f)["metadatos"]
-    return index, metadata
-
 def buscar_contexto_para_gemini(consulta, top_k=3):
-    index, metadata = cargar_index_y_metadata()
-    vector_consulta = obtener_embedding(consulta)
+    if index is None or metadata is None:
+        raise RuntimeError("⚠️ El índice FAISS no está disponible en memoria")
+
+    vector_consulta = obtener_embedding_cacheado(consulta)
     D, I = index.search(np.array([vector_consulta]), k=top_k)
+
     contexto = ""
     for idx in I[0]:
         doc = metadata[idx]
