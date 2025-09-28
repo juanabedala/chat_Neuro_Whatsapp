@@ -7,6 +7,9 @@ python-dotenv==1.0.1
 Werkzeug==3.0.3
 gunicorn==22.0.0
 requests==2.32.3
+torch==2.2.0
+sentence-transformers==2.2.2
+
 
 
 
