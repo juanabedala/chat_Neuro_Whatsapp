@@ -5,11 +5,11 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import os
 from functools import lru_cache
-from datetime import datetime
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
+from sentence_transformers import SentenceTransformer
 
 # === CONFIGURACIÓN ===
 load_dotenv()
@@ -22,17 +22,10 @@ genai.configure(api_key=API_KEY)
 INDEX_FILE = "vector_index.faiss"
 METADATA_FILE = "metadata.json"
 
-# === CONTROL DE USO DE EMBEDDINGS ===
-uso_embeddings = {"fecha": datetime.now().date(), "count": 0}
-
-def contar_embedding_call():
-    """Lleva un conteo diario de las llamadas al modelo embedding-001"""
-    global uso_embeddings
-    hoy = datetime.now().date()
-    if uso_embeddings["fecha"] != hoy:
-        uso_embeddings = {"fecha": hoy, "count": 0}
-    uso_embeddings["count"] += 1
-    print(f"📊 Llamadas a embedding hoy: {uso_embeddings['count']}")
+# === MODELO DE EMBEDDINGS LOCAL ===
+print("⏳ Cargando modelo de embeddings local (all-MiniLM-L6-v2)...")
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+print("✅ Modelo de embeddings cargado")
 
 # === APP FLASK ===
 app = Flask(__name__)
@@ -63,29 +56,17 @@ except Exception as e:
     index, metadata = None, None
 
 @lru_cache(maxsize=5000)
-def obtener_embedding_cacheado(texto):
-    """Devuelve el embedding del texto con cacheo para evitar llamadas repetidas"""
-    print("📩 Texto a embebear:", texto[:200])  # primeros 200 chars
-    contar_embedding_call()
-    response = genai.embed_content(
-        model="models/embedding-001",
-        content=texto,
-        task_type="RETRIEVAL_QUERY"
-    )
-
-    # Manejo flexible según versión de librería
-    if isinstance(response, dict):
-        return np.array(response["embedding"], dtype=np.float32)
-    elif hasattr(response, "embedding"):
-        return np.array(response.embedding, dtype=np.float32)
-    else:
-        raise ValueError(f"❌ No se encontró el embedding en la respuesta: {response}")
+def obtener_embedding_local(texto: str):
+    """Devuelve el embedding usando SentenceTransformer con cache"""
+    print("📩 Texto a embebear (local):", texto[:200])  # primeros 200 chars
+    vector = embedding_model.encode([texto], convert_to_numpy=True)[0]
+    return np.array(vector, dtype=np.float32)
 
 def buscar_contexto_para_gemini(consulta, top_k=3):
     if index is None or metadata is None:
         raise RuntimeError("⚠️ El índice FAISS no está disponible en memoria")
 
-    vector_consulta = obtener_embedding_cacheado(consulta)
+    vector_consulta = obtener_embedding_local(consulta)
     D, I = index.search(np.array([vector_consulta]), k=top_k)
 
     contexto = ""
