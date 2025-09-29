@@ -42,9 +42,15 @@ CORS(
 def cargar_index_y_metadata():
     if not os.path.exists(INDEX_FILE) or not os.path.exists(METADATA_FILE):
         raise FileNotFoundError("❌ No se encontraron los archivos FAISS o metadata.json")
+    
     index = faiss.read_index(INDEX_FILE)
+    
     with open(METADATA_FILE, "r", encoding="utf-8") as f:
-        metadata = json.load(f)["metadatos"]
+        metadata = json.load(f)
+        # Aseguramos que es lista de diccionarios
+        if not isinstance(metadata, list):
+            raise ValueError("❌ metadata.json debe ser una lista de diccionarios")
+    
     return index, metadata
 
 # Cargamos FAISS y metadata una sola vez al inicio
