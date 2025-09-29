@@ -78,7 +78,7 @@ def buscar_contexto_para_gemini(consulta, top_k=3):
     contexto = ""
     for idx in I[0]:
         doc = metadata[idx]
-        contexto += f"Documento: {doc['documento']}\nTexto: {doc['texto']}\n\n"
+        contexto += f"Documento: {doc['file']}\nTexto: {doc['text']}\n\n"
     return contexto
 
 def responder_con_gemini(pregunta, contexto):
